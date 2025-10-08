@@ -18,6 +18,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,6 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final CustomerDetailsService customerDetailsService;
+    private final HandlerExceptionResolver handlerExceptionResolver;
 
 
     @Override
@@ -44,42 +46,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String jwt = authHeader.substring(7);
 
-        // validate jwt token  with secret key
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(jwtUtil.getSecretKey())
-                .build()
-                .parseClaimsJws(jwt)
-                .getBody();
-        // extracting username from the token claims
-        String username =claims.getSubject();
+        try {
+            // validate jwt token  with secret key
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(jwtUtil.getSecretKey())
+                    .build()
+                    .parseClaimsJws(jwt)
+                    .getBody();
+            // extracting username from the token claims
+            String username = claims.getSubject();
 
-        List<String> roles = (List<String>) claims.get("roles");
+            List<String> roles = (List<String>) claims.get("roles");
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null){
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UserDetails userDetails = customerDetailsService.loadUserByUsername(username);
+                UserDetails userDetails = customerDetailsService.loadUserByUsername(username);
 
-            List<SimpleGrantedAuthority> authorities = roles.stream()
-                    .map(SimpleGrantedAuthority::new)
-                    .toList();
-
-
-            UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
-
-            usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-            SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
+                List<SimpleGrantedAuthority> authorities = roles.stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .toList();
 
 
+                UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
+
+                usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
+
+
+            }
+
+            filterChain.doFilter(request, response);
+        }catch (Exception e){
+handlerExceptionResolver.resolveException(request, response, null, e);
         }
-
-        filterChain.doFilter(request, response);
-
-
-
-
-
-
-
     }
 }
