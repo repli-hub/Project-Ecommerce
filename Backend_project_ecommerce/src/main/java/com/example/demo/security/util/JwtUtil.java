@@ -22,7 +22,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(jwtSecretKey.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateSecretKey(UserPrincipal userPrincipal){
+    public String generateToken(UserPrincipal userPrincipal){
         List<String> roles = userPrincipal.getAuthorities()
                 .stream()
                 .map(GrantedAuthority::getAuthority)
