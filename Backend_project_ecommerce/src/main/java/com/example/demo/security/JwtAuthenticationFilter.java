@@ -3,15 +3,15 @@ package com.example.demo.security;
 
 import com.example.demo.security.util.JwtUtil;
 import com.example.demo.service.CustomerDetailsService;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
+
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -21,6 +21,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -46,33 +47,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String jwt = authHeader.substring(7);
 
         try {
-            // validate jwt token  with secret key
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(jwtUtil.getSecretKey())
-                    .build()
-                    .parseClaimsJws(jwt)
-                    .getBody();
-            // extracting username from the token claims
-            String username = claims.getSubject();
 
-            List<String> roles = (List<String>) claims.get("roles");
+            String username = jwtUtil.extractUsername(jwt);
+
+            List<String> roles = jwtUtil.extractRoles(jwt);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
                 UserDetails userDetails = customerDetailsService.loadUserByUsername(username);
-
-                List<SimpleGrantedAuthority> authorities = roles.stream()
-                        .map(SimpleGrantedAuthority::new)
-                        .toList();
-
-
-                UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
-
-                usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
-
-
+                if (jwtUtil.isTokenValid(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(userDetails, null, roles.stream()
+                                    .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new)
+                                    .toList());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
 
             filterChain.doFilter(request, response);
